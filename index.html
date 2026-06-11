@@ -37,6 +37,10 @@
           分公司
           <select id="branchFilter"></select>
         </label>
+        <label>
+          搭車時段
+          <select id="periodFilter"></select>
+        </label>
       </section>
 
       <section class="kpi-grid" aria-label="首頁 KPI">
@@ -156,11 +160,32 @@
 
         <article class="panel">
           <div class="panel-head">
-            <h2>近期文字回饋</h2>
-            <p>自動分類最近 8 筆滿意與需改善內容</p>
+            <h2>搭車時段表現</h2>
+            <p>早尖峰、晚尖峰與離峰比較</p>
           </div>
-          <div id="feedbackList" class="feedback-list"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>搭車時段</th>
+                  <th>樣本數</th>
+                  <th>成功率</th>
+                  <th>平均分</th>
+                  <th>平均車資</th>
+                </tr>
+              </thead>
+              <tbody id="periodTable"></tbody>
+            </table>
+          </div>
         </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>近期文字回饋</h2>
+          <p>自動分類最近 8 筆滿意與需改善內容</p>
+        </div>
+        <div id="feedbackList" class="feedback-list"></div>
       </section>
     </main>
 

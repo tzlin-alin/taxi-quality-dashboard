@@ -1,4 +1,4 @@
-const BUILT_IN_SHEET_SOURCE = "https://docs.google.com/spreadsheets/d/1FLttzXwaIJ51oRy94nfyu0gDsRMBuzZXtys8FQ9zen0/edit?usp=sharing";
+const BUILT_IN_SHEET_SOURCE = "https://docs.google.com/spreadsheets/d/1Z572y0V2LZT3eOevOTwNNGROP3sNaJ8m2-D3_DuioCc/edit";
 const CONFIG_SOURCE = window.DASHBOARD_CONFIG?.sheetUrl?.trim() || BUILT_IN_SHEET_SOURCE;
 const SAMPLE_SOURCE = "./sample-data.csv";
 const DEFAULT_SOURCE = CONFIG_SOURCE || SAMPLE_SOURCE;
@@ -42,7 +42,7 @@ const compareModes = {
 const state = {
   rows: [],
   source: CONFIG_SOURCE || localStorage.getItem("dashboardCsvSource") || DEFAULT_SOURCE,
-  filters: { month: ALL, branch: ALL, compareMode: "taxi" },
+  filters: { month: ALL, branch: ALL, period: ALL, compareMode: "taxi" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -84,7 +84,10 @@ function parseCsv(text) {
 
 function toNumber(value) {
   if (value === null || value === undefined || String(value).trim() === "") return null;
-  const number = Number(String(value).replace(/[$,NTD\s]/g, ""));
+  const text = String(value).trim();
+  const scoreMatch = text.match(/^([1-5])(?:\s|$)/);
+  if (scoreMatch) return Number(scoreMatch[1]);
+  const number = Number(text.replace(/[$,NTD\s]/g, ""));
   return Number.isFinite(number) ? number : null;
 }
 
@@ -113,6 +116,7 @@ function normalizeRows(rows) {
       平台: ride.platform,
       月份: row["月份"] || String(row["搭乘日期"] || "").slice(0, 7),
       分公司: row["分公司"] || row["所屬分公司"],
+      搭車時段: row["搭車時段"] || row["搭乘時段"] || "",
       車種: ride.vehicleType,
       是否有叫到車輛: row["是否有叫到車輛"],
       實際車資: toNumber(row["實際車資"]),
@@ -148,7 +152,8 @@ function selectedMode() {
 function getFilteredRows() {
   return state.rows.filter((row) => {
     return (state.filters.month === ALL || row.月份 === state.filters.month)
-      && (state.filters.branch === ALL || row.分公司 === state.filters.branch);
+      && (state.filters.branch === ALL || row.分公司 === state.filters.branch)
+      && (state.filters.period === ALL || row.搭車時段 === state.filters.period);
   });
 }
 
@@ -317,6 +322,30 @@ function renderBranchTable(rows) {
   }).join("") || `<tr><td colspan="5">${$("emptyTemplate").innerHTML}</td></tr>`;
 }
 
+function renderPeriodTable(rows) {
+  const modeRows = [...rowsForSide(rows, "left"), ...rowsForSide(rows, "right")];
+  const periods = ["早尖峰(7-9)", "晚尖峰(17-19)", "離峰", ...Array.from(new Set(modeRows.map((row) => row.搭車時段).filter(Boolean)))];
+  const uniquePeriods = Array.from(new Set(periods)).filter((period) => modeRows.some((row) => row.搭車時段 === period));
+
+  $("periodTable").innerHTML = uniquePeriods.map((period) => {
+    const scoped = modeRows.filter((row) => row.搭車時段 === period);
+    const scored = scoped.filter((row) => row.加權總分 !== null);
+    const attempts = scoped.filter((row) => row.是否有叫到車輛);
+    const successRate = attempts.length ? attempts.filter((row) => row.是否有叫到車輛 === "是").length / attempts.length : null;
+    const avgScore = average(scored.map((row) => row.加權總分));
+    const avgFare = average(scored.map((row) => row.實際車資));
+    return `
+      <tr>
+        <td>${period}</td>
+        <td>${scored.length}</td>
+        <td>${successRate === null ? "-" : pct.format(successRate)}</td>
+        <td>${avgScore === null ? "-" : fmt.format(avgScore)}</td>
+        <td>${avgFare === null ? "-" : currency.format(avgFare)}</td>
+      </tr>
+    `;
+  }).join("") || `<tr><td colspan="5">${$("emptyTemplate").innerHTML}</td></tr>`;
+}
+
 function classifyFeedback(text) {
   const value = String(text || "");
   if (/車資|付款|路線|收據|費用/.test(value)) return "路線車資付款";
@@ -350,6 +379,7 @@ function render() {
   $("rightBranchHeader").textContent = mode.rightLabel;
   fillSelect($("monthFilter"), uniqueOptions("月份"), state.filters.month);
   fillSelect($("branchFilter"), uniqueOptions("分公司"), state.filters.branch);
+  fillSelect($("periodFilter"), uniqueOptions("搭車時段"), state.filters.period);
   $("compareMode").value = state.filters.compareMode;
   const rows = getFilteredRows();
   renderKpis(rows);
@@ -359,6 +389,7 @@ function render() {
   renderLowScores(rows);
   renderManagementNotes(rows);
   renderBranchTable(rows);
+  renderPeriodTable(rows);
   renderFeedback(rows);
 }
 
@@ -434,6 +465,10 @@ function bindEvents() {
   });
   $("branchFilter").addEventListener("change", (event) => {
     state.filters.branch = event.target.value;
+    render();
+  });
+  $("periodFilter").addEventListener("change", (event) => {
+    state.filters.period = event.target.value;
     render();
   });
   $("refreshButton").addEventListener("click", () => loadData().catch(showError));

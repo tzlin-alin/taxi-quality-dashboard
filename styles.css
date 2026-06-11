@@ -88,7 +88,7 @@ main {
 
 .control-strip {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr);
+  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(150px, 1fr);
   gap: 12px;
   align-items: end;
   margin-bottom: 16px;
